@@ -1,0 +1,18 @@
+let StartEvents = traces | extend correlationId = tostring(customDimensions["correlationId"]), type = tostring(customDimensions["type"]) 
+    | where type == "start"
+    | summarize maxtime=max(timestamp) by correlationId;
+
+let EndEvents = traces | extend correlationId = tostring(customDimensions["correlationId"]), type = tostring(customDimensions["type"]) 
+    | where type == "end"
+    | summarize maxtime=max(timestamp) by correlationId;
+
+
+EndEvents
+| project correlationId, end=maxtime
+| join (StartEvents
+    | project start=maxtime, correlationId)
+    on correlationId
+| project correlationId, durationInSecs = toint(format_timespan(end - start,'s')), duration = end - start, end
+| sort by end
+| summarize percentiles(durationInSecs, 50, 90, 95, 99) 
+| render table;
